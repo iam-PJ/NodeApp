@@ -69,7 +69,7 @@ pipeline {
                 script {
                     sshagent(['Ubuntukey']) {
                         sh '''
-                        ssh -o StrictHostKeyChecking=no ubuntu@3.14.142.88 "
+                        ssh -o StrictHostKeyChecking=no ubuntu@PUBLICIP OF LIVESERVER "
                             cd /home/ubuntu/NodeApp/ &&
                             git pull https://github.com/iam-PJ/NodeApp.git &&
                             docker stop nodecontainer || true &&
