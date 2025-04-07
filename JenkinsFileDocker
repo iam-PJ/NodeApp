@@ -4,7 +4,11 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                checkout scmGit(branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/iam-PJ/NodeApp.git']]) 
+                checkout scmGit(
+                    branches: [[name: '*/master']], 
+                    extensions: [], 
+                    userRemoteConfigs: [[url: 'https://github.com/iam-PJ/NodeApp.git']]
+                ) 
             }
         }
 
@@ -12,7 +16,7 @@ pipeline {
             steps {
                 echo "Building Docker image..."
                 sh '''
-                    docker build -t nodeimg .
+                    docker buildd -t nodeimg .
                 '''
             }
         }
@@ -21,13 +25,12 @@ pipeline {
             steps {
                 echo "Testing Docker container..."
                 sh '''
-                   #!/bin/bash
+                    #!/bin/bash
 
                     docker stop nodecontainer || true
                     docker rm nodecontainer || true
                     docker run -d --name nodecontainer -p 80:3000 nodeimg
 
-                    # Wait for the container to be running
                     max_attempts=30
                     current_attempt=0
 
@@ -54,11 +57,12 @@ pipeline {
 
         stage('Push To DockerHub') {
             steps {
+                echo "Pushing image to DockerHub..."
                 sh '''
-                docker build -t nodeimg .
-                echo "PASTE PAT TOKEN HERE" | docker login -u prathmeshj476  --password-stdin
-                docker tag nodeimg prathmeshj476/newnodeimg 
-                docker push prathmeshj476/newnodeimg 
+                    docker build -t nodeimg .
+                    echo "Paste PAT Toekn" | docker login -u prathmeshj476 --password-stdin
+                    docker tag nodeimg prathmeshj476/newnodeimg 
+                    docker push prathmeshj476/newnodeimg 
                 '''
             }
         }
@@ -69,20 +73,64 @@ pipeline {
                 script {
                     sshagent(['Ubuntukey']) {
                         sh '''
-                        ssh -o StrictHostKeyChecking=no ubuntu@PUBLICIP OF LIVESERVER "
-                            cd /home/ubuntu/NodeApp/ &&
-                            git pull https://github.com/iam-PJ/NodeApp.git &&
-                            docker stop nodecontainer || true &&
-                            docker rm nodecontainer || true &&
-                            docker rmi prathmeshj476/newnodeimg || true &&
-                            docker rmi newnodeimg || true &&
-                            docker pull prathmeshj476/newnodeimg &&
-                            docker run -d --name nodecontainer -p 80:3000 prathmeshj476/newnodeimg
-                        "
+                            ssh -o StrictHostKeyChecking=no ubuntu@PUBLICIP OF SERVER bash -s <<'ENDSSH'
+                                cd /home/ubuntu/NodeApp/ &&
+                                git pull https://github.com/iam-PJ/NodeApp.git &&
+                                docker stop nodecontainer || true &&
+                                docker rm nodecontainer || true &&
+                                docker rmi prathmeshj476/newnodeimg || true &&
+                                docker rmi newnodeimg || true &&
+                                docker pull prathmeshj476/newnodeimg &&
+                                docker run -d --name nodecontainer -p 80:3000 prathmeshj476/newnodeimg
+ENDSSH
                         '''
                     }
                 }
             }
+        }
+    }
+
+    post {
+        success {
+            emailext(
+                subject: "${env.JOB_NAME} - Build #${env.BUILD_NUMBER} - SUCCESS",
+                body: """
+                Hi Team,
+
+                The build was successful.
+
+                Project: ${env.JOB_NAME}  
+                Build Number: ${env.BUILD_NUMBER}  
+                Status: SUCCESS
+
+                Check details: ${env.BUILD_URL}
+
+                Regards,  
+                Automation Team
+                """,
+                to: "Yourmail@gmail.com"
+            )
+        }
+
+        failure {
+            emailext(
+                subject: "${env.JOB_NAME} - Build #${env.BUILD_NUMBER} - FAILED",
+                body: """
+                Hi Team,
+
+                The build has failed.
+
+                Project: ${env.JOB_NAME}  
+                Build Number: ${env.BUILD_NUMBER}  
+                Status: FAILED
+
+                Console output: ${env.BUILD_URL}
+
+                Regards,  
+                Automation Team
+                """,
+                to: "yourmail@gmail.com"
+            )
         }
     }
 }
